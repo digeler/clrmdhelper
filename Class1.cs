@@ -221,8 +221,20 @@ namespace clrmd
                                     }))
             {
                 Console.WriteLine("{0,6:n0} {1,12:n0} {2}", region.Count, region.TotalSize, region.Type);
+                
             }
+            Console.WriteLine("Loader Heap: contains CLR structures and the type system");
+            Console.WriteLine("High Frequency Heap: statics, MethodTables, FieldDescs, interface map");
+            Console.WriteLine("Low Frequency Heap: EEClass, ClassLoader and lookup tables");
+            Console.WriteLine("Stub Heap: stubs for CAS, COM wrappers, PInvoke");
+            Console.WriteLine("Large Object Heap: memory allocations that require more than 85k bytes");
+            Console.WriteLine("GC Heap: user allocated heap memory private to the app");
+            Console.WriteLine("JIT Code Heap: memory allocated by mscoreee (Execution Engine) and the JIT compiler for managed code");
+            Console.WriteLine("Process/Base Heap: interop/unmanaged allocations, native memory, etc");
+            Console.WriteLine("In general, only the GC Segments (and Reserve GC Segments) should really be eating much memory in your process. The total memory for each other type of heap in your process should be less than 50 megs (slightly more for very large dumps). If something is eating more than 100 megs of memory (and it's not a GC Segment) then that's a red flag for investigation.");
+
+
         }
-}
+    }
     }
 
