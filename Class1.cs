@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.Diagnostics.Runtime;
 using System.IO;
+using System.Linq;
 
 namespace clrmd
 {
@@ -10,6 +11,8 @@ namespace clrmd
         private string mscrdwaksloc;
         private string symbolserverEnv;
         private ClrRuntime runtime;
+        
+        
 
         public Clrmdhelper()
         {
@@ -22,23 +25,31 @@ namespace clrmd
             Console.WriteLine("please load the diagnostics module");
             string a = "[System.Reflection.Assembly]::LoadFrom('C:\\clrmd\\clrmd\\packages\\Microsoft.Diagnostics.Runtime.1.1.61812\\lib\\net45\\Microsoft.Diagnostics.Runtime.dll')";
             Console.WriteLine("please use the following command {0}", a);
-            string sym = "https://msdl.microsoft.com/download/symbols";
-            Console.WriteLine("using default env sympbol {0}", sym);
-            Environment.SetEnvironmentVariable("_NT_SYMBOL_PATH", sym);
-            Console.WriteLine("Enter Dump Path");
-            Path = Console.ReadLine();
-           
+           // string sym = "https://msdl.microsoft.com/download/symbols";
+
+           // Console.WriteLine("using default env sympbol {0}", sym);
+           // Environment.SetEnvironmentVariable("_NT_SYMBOL_PATH", sym);
+            //  Console.WriteLine("Enter Dump Path");
+            //Path = Console.ReadLine();
+            Path = "c:\\memconsume.dmp";
+
+
             Console.WriteLine("Enter Dac Location,If Unknown Leave Blank");
             Mscrdwaksloc = Console.ReadLine();
-            Console.WriteLine("Enter Symbol Server Location ,default is public");
-            SymbolserverEnv = Console.ReadLine();
-            if (SymbolserverEnv == null)
-            {
-                SymbolserverEnv = sym;  
-            }
-            Setenv();
+           
             Dumpinfo();
-            ClrRuntime runtime = Runtime();
+            runtime = Runtime();
+            Console.WriteLine("Press enter for autoanalysis");
+            string aa = Console.ReadLine();
+            if (aa == "")
+            {
+
+                Getappdomains();
+                Getmodules();
+                Getthreads();
+                Memenum();
+            }
+            Console.WriteLine("Assembly Loded");
 
 
 
@@ -67,6 +78,7 @@ namespace clrmd
 
         }
 
+       
         public void Dumpinfo()
         {
             using (DataTarget dataTarget = DataTarget.LoadCrashDump(path))
@@ -90,7 +102,7 @@ namespace clrmd
                     Console.WriteLine("Filesize:  {0:X}", dacInfo.FileSize);
                     Console.WriteLine("Timestamp: {0:X}", dacInfo.TimeStamp);
                     Console.WriteLine("Dac File:  {0}", dacInfo.FileName);
-                    ClrInfo runtimeInfo = dataTarget.ClrVersions[0];
+                   // ClrInfo runtimeInfo = dataTarget.ClrVersions[0];
 
 
                     // If we just happen to have the correct dac file installed on the machine,
@@ -126,6 +138,7 @@ namespace clrmd
 
             if (File.Exists(mscrdwaksloc))
             {
+               
                 Console.WriteLine("using {0} for dac loc", mscrdwaksloc);
                 DataTarget dataTarget = DataTarget.LoadCrashDump(path);
                 ClrInfo runtimeInfo = dataTarget.ClrVersions[0];
@@ -138,6 +151,7 @@ namespace clrmd
 
           if (!File.Exists(mscrdwaksloc))
             {
+              
                 DataTarget dataTarget = DataTarget.LoadCrashDump(path);
                 ClrInfo runtimeInfo = dataTarget.ClrVersions[0];
                 ClrRuntime runtime = runtimeInfo.CreateRuntime();
@@ -151,14 +165,64 @@ namespace clrmd
 
         public void Getappdomains()
         {
+            Console.WriteLine("****Dumping AppDomains****");
             foreach (ClrAppDomain domain in runtime.AppDomains)
             {
                 Console.WriteLine("ID:      {0}", domain.Id);
                 Console.WriteLine("Name:    {0}", domain.Name);
                 Console.WriteLine("Address: {0}", domain.Address);
+
             }
-        }
+
+
 
         }
+        public void Getmodules()
+        {
+            Console.WriteLine("****Dumping Modules****");
+            foreach (ClrAppDomain domain in runtime.AppDomains)
+            {
+                foreach (ClrModule module in domain.Modules)
+                {
+                    Console.WriteLine("Module: {0}", module.Name);
+                }
+            }
+
+
+
+        }
+        public void Getthreads() {
+            Console.WriteLine("****Dumping threads****");
+            foreach (ClrThread thread in runtime.Threads)
+            {
+                if (!thread.IsAlive)
+                    continue;
+
+                Console.WriteLine("Thread {0:X}:", thread.OSThreadId);
+
+                foreach (ClrStackFrame frame in thread.StackTrace)
+                    Console.WriteLine("{0,12:X} {1,12:X} {2}", frame.StackPointer.ToString(), frame.InstructionPointer.ToString(), frame.ToString());
+            }
+    Console.WriteLine();
+}
+        public void Memenum() {
+            Console.WriteLine("****Dumping Mem****");
+
+            foreach (var region in (from r in runtime.EnumerateMemoryRegions()
+                                    where r.Type != ClrMemoryRegionType.ReservedGCSegment
+                                    group r by r.Type into g
+                                    let total = g.Sum(p => (uint)p.Size)
+                                    orderby total descending
+                                    select new
+                                    {
+                                        TotalSize = total,
+                                        Count = g.Count(),
+                                        Type = g.Key
+                                    }))
+            {
+                Console.WriteLine("{0,6:n0} {1,12:n0} {2}", region.Count, region.TotalSize, region.Type);
+            }
+        }
+}
     }
 
